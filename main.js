@@ -10,13 +10,76 @@ var volumeData = {
 	sidel:0
 }; 
 
+	function toFormattedTime(input){
+        input = Math.ceil(input); // На случай, если дробное
+        var hoursString = '00';
+        var minutesString = '00 ';
+        var secondsString = '00';
+        var hours = 0;
+        var minutes = 0;
+        var seconds = 0;
+        hours = Math.floor(input / (60 * 60));
+        input = input % (60 * 60);
+        minutes = Math.floor(input / 60);
+        input = input % 60;
+        seconds = input;
+        hoursString = (hours >= 10) ? hours.toString() : '0' + hours.toString();
+        minutesString = (minutes >= 10) ? minutes.toString() : '0' + minutes.toString();
+        secondsString = (seconds >= 10) ? seconds.toString() : '0' + seconds.toString();
+        return hoursString + ':' + minutesString + ':' + secondsString;
+    }
+
 	function updateVolume(){
-	console.log(volumeData);
 		var localvolume = (volumeData.frontl+volumeData.frontr)/2;
-		console.log(localvolume);
 		volume = localvolume;
 		document.id('volume-level').set('html',volume+'%');
 	};
+
+	function updatePayingTime(time){
+		document.id('payingtime').set('html',time);
+	}
+	
+	
+	var intervalid ;
+	
+	
+	function updatePaying(paying){
+		if(paying.name){
+			clearInterval(intervalid);
+ 		    intervalid = window.setInterval(function(){
+				paying.time++;
+				updatePayingTime(toFormattedTime(paying.time));
+			}, 1000);
+			document.id('paying').set('html',paying.name);
+			updatePayingTime(toFormattedTime(paying.time));
+		}else{
+			clearInterval(intervalid);
+			document.id('paying').set('html','not playing');
+			updatePayingTime('00:00:00');
+		}
+	}
+	
+	function updateMute(type){
+	var mute = document.id('mutebtn');
+		if(type){
+			mute.removeClass('btn-info');
+			mute.addClass('btn-danger');
+			mute.set('data-value','on');
+		}else{
+			mute.removeClass('btn-danger');
+			mute.addClass('btn-info');
+			mute.set('data-value','off');
+		}
+	}
+	
+
+	function updateSate(data){
+		volumeData = data.volume;
+		updatePaying(data.play);
+		updateMute(data.mute);
+		updateVolume();
+	}
+
 
 
 	function loadData(action,value,target){
@@ -37,31 +100,29 @@ var volumeData = {
 							'data-value':el.value,
 						}).inject(target);
 					})
-				}else if(action=='getvolumes'){
-					volumeData = data;
-					updateVolume();
+				}else if(action=='playerstate'){
+					updateSate(data);
 				}
 				
 			}
 		}).post();
 	};
 
+	
 	function updateWindow(action,value,target){
-		console.log('start');
 		new Request.JSON({
 			'timeout':10000,
 			'url':'server.php?update=true',
 			'data':{
-				'action':'update',
+				'action':'playerstate',
 				'value':value?value:false
 			},
 			onSuccess:function(data){
-				console.log('ssss',data);
+				updateSate(data);
 				updateWindow();
-				loadData('getvolumes');
+				//loadData('getvolumes');
 			},
 			onFailure:function(data){
-				console.log('eeee');
 				updateWindow();
 			},
 		}).get();
@@ -80,7 +141,7 @@ function getTask(el){
 
 document.addEvent('domready',function(){
 	loadData('palylist','', document.id('explorer'));
-	loadData('getvolumes','all', document.id('explorer'));
+	loadData('playerstate','all', document.id('explorer'));
 	updateWindow();
 });
 
@@ -108,18 +169,10 @@ document.addEvent('click',function(e){
 	}
 	
 	if(task.action=='mute'){
-		if(task.value=='off'){
-			e.target.removeClass('btn-info');
-			e.target.addClass('btn-danger');
-			e.target.set('data-value','on');
-		}else{
-			e.target.removeClass('btn-danger');
-			e.target.addClass('btn-info');
-			e.target.set('data-value','off');
-		}
+		updateMute(task.value=='off');
 	}
 	loadData(task.action,task.value,document.id('explorer'));
-	loadData('getvolumes');
+	loadData('playerstate');
 	
 });
 
